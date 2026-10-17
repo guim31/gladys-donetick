@@ -30,6 +30,18 @@ Gladys before reporting a problem.
 
 In scope: the code of this repository and the Docker image it publishes.
 
+What the integration handles:
+
+- the **Donetick access token**, stored by Gladys in the integration
+  configuration (a `secret` field), sent only to the configured Donetick
+  address in the `secretkey` header, and never logged;
+- under `/data`, only `donetick-state.json`: the chores already announced to
+  scenes and the history entries already seen (chore ids and due dates, no
+  token, no name);
+- network: outgoing HTTP(S) requests to the configured Donetick address only.
+  With "Accept self-signed certificates" ticked, the certificate of that
+  address is not verified.
+
 Out of scope: Gladys Assistant itself (see its
 [security policy](https://github.com/GladysAssistant/Gladys/security/policy)),
-and the third-party services and devices the integration talks to.
+and Donetick itself.

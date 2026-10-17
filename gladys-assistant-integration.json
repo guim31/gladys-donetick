@@ -1,177 +1,553 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "Donetick",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Donetick household chores: today's and overdue chores, done from the dashboard or a scene.",
+    "fr": "Corvées Donetick : tâches du jour et en retard, faites depuis le tableau de bord ou une scène.",
+    "de": "Donetick-Hausarbeiten: heutige und überfällige Aufgaben, erledigt per Dashboard oder Szene.",
+    "es": "Tareas de Donetick: del día y atrasadas, marcadas como hechas desde el panel o una escena."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
+  "docker_image": "ghcr.io/guim31/gladys-donetick:1.0.0",
   "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-donetick/main/cover.png",
+  "categories": ["services"],
+  "transports": ["local"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": {
+        "en": "Your Donetick",
+        "fr": "Votre Donetick",
+        "de": "Dein Donetick",
+        "es": "Su Donetick"
+      },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "A self-hosted Donetick. In Donetick, create an access token: Settings, Access tokens. Chores are completed as the user of the token.",
+        "fr": "Un Donetick auto-hébergé. Dans Donetick, créez un jeton d'accès : Settings, Access tokens. Les tâches sont marquées faites au nom de l'utilisateur du jeton.",
+        "de": "Ein selbst gehostetes Donetick. Erstelle in Donetick ein Zugriffstoken: Settings, Access tokens. Aufgaben werden im Namen des Token-Benutzers erledigt.",
+        "es": "Un Donetick autoalojado. En Donetick, cree un token de acceso: Settings, Access tokens. Las tareas se marcan como hechas en nombre del usuario del token."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://docs.donetick.com/",
+          "label": {
+            "en": "Donetick documentation",
+            "fr": "Documentation de Donetick",
+            "de": "Donetick-Dokumentation",
+            "es": "Documentación de Donetick"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
+      "key": "url",
+      "type": "string",
+      "label": {
+        "en": "Address",
+        "fr": "Adresse",
+        "de": "Adresse",
+        "es": "Dirección"
       },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
+      "description": {
+        "en": "Address of Donetick, with https:// for HTTPS and :port if not the default (2021 for the Docker image).",
+        "fr": "Adresse de Donetick, avec https:// pour le HTTPS et :port s'il n'est pas standard (2021 pour l'image Docker).",
+        "de": "Adresse von Donetick, mit https:// für HTTPS und :Port, falls nicht Standard (2021 beim Docker-Image).",
+        "es": "Dirección de Donetick, con https:// para HTTPS y :puerto si no es el estándar (2021 para la imagen Docker)."
+      },
+      "placeholder": {
+        "en": "e.g. http://192.168.1.20:2021",
+        "fr": "ex. http://192.168.1.20:2021",
+        "de": "z. B. http://192.168.1.20:2021",
+        "es": "p. ej. http://192.168.1.20:2021"
+      },
       "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
+      "default": ""
     },
     {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
+      "key": "api_token",
+      "type": "secret",
+      "label": {
+        "en": "Access token",
+        "fr": "Jeton d'accès",
+        "de": "Zugriffstoken",
+        "es": "Token de acceso"
       },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
+      "description": {
+        "en": "Created in Donetick: Settings, Access tokens. It starts with dt_.",
+        "fr": "Créé dans Donetick : Settings, Access tokens. Il commence par dt_.",
+        "de": "Erstellt in Donetick: Settings, Access tokens. Es beginnt mit dt_.",
+        "es": "Creado en Donetick: Settings, Access tokens. Empieza por dt_."
+      },
+      "required": true
     },
     {
-      "key": "unit",
-      "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
+      "key": "options",
+      "type": "section",
+      "label": {
+        "en": "Options",
+        "fr": "Options",
+        "de": "Optionen",
+        "es": "Opciones"
+      }
+    },
+    {
+      "key": "member_devices",
+      "type": "boolean",
+      "label": {
+        "en": "One device per member",
+        "fr": "Un appareil par membre",
+        "de": "Ein Gerät pro Mitglied",
+        "es": "Un dispositivo por miembro"
+      },
+      "description": {
+        "en": "Besides the household device, one device per member of the circle, for the chores assigned to them.",
+        "fr": "En plus de l'appareil du foyer, un appareil par membre du cercle, pour les tâches qui lui sont assignées.",
+        "de": "Zusätzlich zum Haushaltsgerät ein Gerät pro Mitglied des Kreises, für die ihm zugewiesenen Aufgaben.",
+        "es": "Además del dispositivo del hogar, un dispositivo por miembro del círculo, para las tareas que tiene asignadas."
+      },
       "required": false,
-      "default": "celsius",
+      "default": true
+    },
+    {
+      "key": "allow_self_signed",
+      "type": "boolean",
+      "label": {
+        "en": "Accept self-signed certificates",
+        "fr": "Accepter les certificats auto-signés",
+        "de": "Selbstsignierte Zertifikate akzeptieren",
+        "es": "Aceptar certificados autofirmados"
+      },
+      "description": {
+        "en": "For an https:// address whose certificate is self-signed. Tick only for your own server.",
+        "fr": "Pour une adresse en https:// dont le certificat est auto-signé. À cocher pour votre propre serveur seulement.",
+        "de": "Für eine https://-Adresse mit selbstsigniertem Zertifikat. Nur für deinen eigenen Server aktivieren.",
+        "es": "Para una dirección https:// con certificado autofirmado. Márquelo solo para su propio servidor."
+      },
+      "required": false,
+      "default": false
+    },
+    {
+      "key": "poll_interval",
+      "type": "select",
+      "label": {
+        "en": "Refresh interval",
+        "fr": "Intervalle de rafraîchissement",
+        "de": "Aktualisierungsintervall",
+        "es": "Intervalo de actualización"
+      },
+      "description": {
+        "en": "How often Donetick is read. Due times and midnight are always followed on time.",
+        "fr": "Fréquence de lecture de Donetick. Les échéances et minuit sont toujours suivis à l'heure.",
+        "de": "Wie oft Donetick gelesen wird. Fälligkeiten und Mitternacht werden immer pünktlich berücksichtigt.",
+        "es": "Con qué frecuencia se lee Donetick. Los vencimientos y la medianoche se siguen siempre a tiempo."
+      },
+      "required": false,
+      "default": "120",
       "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
+        {
+          "value": "60",
+          "label": {
+            "en": "1 minute",
+            "fr": "1 minute",
+            "de": "1 Minute",
+            "es": "1 minuto"
+          }
+        },
+        {
+          "value": "120",
+          "label": {
+            "en": "2 minutes",
+            "fr": "2 minutes",
+            "de": "2 Minuten",
+            "es": "2 minutos"
+          }
+        },
+        {
+          "value": "300",
+          "label": {
+            "en": "5 minutes",
+            "fr": "5 minutes",
+            "de": "5 Minuten",
+            "es": "5 minutos"
+          }
+        },
+        {
+          "value": "600",
+          "label": {
+            "en": "10 minutes",
+            "fr": "10 minutes",
+            "de": "10 Minuten",
+            "es": "10 minutos"
+          }
+        }
       ]
     },
     {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "key": "language",
+      "type": "select",
+      "label": {
+        "en": "Language of the feature names",
+        "fr": "Langue des noms de fonctionnalités",
+        "de": "Sprache der Funktionsnamen",
+        "es": "Idioma de los nombres de funciones"
+      },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+        "en": "Names given to the features when a device is added, and texts sent to scenes.",
+        "fr": "Noms donnés aux fonctionnalités à l'ajout d'un appareil, et textes envoyés aux scènes.",
+        "de": "Namen der Funktionen beim Hinzufügen eines Geräts und an Szenen gesendete Texte.",
+        "es": "Nombres de las funciones al añadir un dispositivo y textos enviados a las escenas."
       },
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "default": "fr",
+      "options": [
+        {
+          "value": "en",
+          "label": {
+            "en": "English",
+            "fr": "Anglais",
+            "de": "Englisch",
+            "es": "Inglés"
+          }
+        },
+        {
+          "value": "fr",
+          "label": {
+            "en": "French",
+            "fr": "Français",
+            "de": "Französisch",
+            "es": "Francés"
+          }
+        },
+        {
+          "value": "de",
+          "label": {
+            "en": "German",
+            "fr": "Allemand",
+            "de": "Deutsch",
+            "es": "Alemán"
+          }
+        },
+        {
+          "value": "es",
+          "label": {
+            "en": "Spanish",
+            "fr": "Espagnol",
+            "de": "Spanisch",
+            "es": "Español"
+          }
+        }
+      ]
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
+      "key": "test_connection",
+      "label": {
+        "en": "Test the connection",
+        "fr": "Tester la connexion",
+        "de": "Verbindung testen",
+        "es": "Probar la conexión"
+      },
+      "description": {
+        "en": "Reads Donetick now and reports what it finds.",
+        "fr": "Lit Donetick maintenant et indique ce qu'il trouve.",
+        "de": "Liest Donetick sofort und meldet, was es findet.",
+        "es": "Lee Donetick ahora e indica lo que encuentra."
+      },
       "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
     }
   ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "chore_overdue",
+      "label": {
+        "en": "Donetick chore overdue",
+        "fr": "Tâche Donetick en retard",
+        "de": "Donetick-Aufgabe überfällig",
+        "es": "Tarea de Donetick atrasada"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "A chore passed its due time without being done. Once per due date.",
+        "fr": "Une tâche a dépassé son échéance sans être faite. Une fois par échéance.",
+        "de": "Eine Aufgabe hat ihre Fälligkeit überschritten, ohne erledigt zu sein. Einmal pro Fälligkeit.",
+        "es": "Una tarea ha superado su vencimiento sin hacerse. Una vez por vencimiento."
       },
       "fields": [
         {
-          "key": "device",
+          "key": "member",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
+          "label": {
+            "en": "Assigned member (empty: anyone)",
+            "fr": "Membre assigné (vide : n'importe qui)",
+            "de": "Zugewiesenes Mitglied (leer: beliebig)",
+            "es": "Miembro asignado (vacío: cualquiera)"
+          }
         },
         {
-          "key": "target",
-          "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
-          "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
-          ]
+          "key": "chore",
+          "type": "string",
+          "label": {
+            "en": "Chore name (empty: any)",
+            "fr": "Nom de la tâche (vide : toutes)",
+            "de": "Name der Aufgabe (leer: beliebig)",
+            "es": "Nombre de la tarea (vacío: cualquiera)"
+          }
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "chore",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Chore",
+            "fr": "Tâche",
+            "de": "Aufgabe",
+            "es": "Tarea"
+          }
+        },
+        {
+          "key": "chore_id",
+          "type": "number",
+          "label": {
+            "en": "Chore number",
+            "fr": "Numéro de la tâche",
+            "de": "Nummer der Aufgabe",
+            "es": "Número de la tarea"
+          }
+        },
+        {
+          "key": "assignee",
+          "type": "string",
+          "label": {
+            "en": "Assigned to",
+            "fr": "Assignée à",
+            "de": "Zugewiesen an",
+            "es": "Asignada a"
+          }
+        },
+        {
+          "key": "due_date",
+          "type": "string",
+          "label": {
+            "en": "Due date (ISO 8601)",
+            "fr": "Échéance (ISO 8601)",
+            "de": "Fälligkeit (ISO 8601)",
+            "es": "Vencimiento (ISO 8601)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "chore_completed",
+      "label": {
+        "en": "Donetick chore done",
+        "fr": "Tâche Donetick faite",
+        "de": "Donetick-Aufgabe erledigt",
+        "es": "Tarea de Donetick hecha"
+      },
+      "description": {
+        "en": "A chore was marked done, in Donetick or from Gladys.",
+        "fr": "Une tâche a été marquée comme faite, dans Donetick ou depuis Gladys.",
+        "de": "Eine Aufgabe wurde als erledigt markiert, in Donetick oder über Gladys.",
+        "es": "Una tarea se ha marcado como hecha, en Donetick o desde Gladys."
+      },
+      "fields": [
+        {
+          "key": "member",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Done by (empty: anyone)",
+            "fr": "Faite par (vide : n'importe qui)",
+            "de": "Erledigt von (leer: beliebig)",
+            "es": "Hecha por (vacío: cualquiera)"
+          }
+        },
+        {
+          "key": "chore",
+          "type": "string",
+          "label": {
+            "en": "Chore name (empty: any)",
+            "fr": "Nom de la tâche (vide : toutes)",
+            "de": "Name der Aufgabe (leer: beliebig)",
+            "es": "Nombre de la tarea (vacío: cualquiera)"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "chore",
+          "type": "string",
+          "label": {
+            "en": "Chore",
+            "fr": "Tâche",
+            "de": "Aufgabe",
+            "es": "Tarea"
+          }
+        },
+        {
+          "key": "chore_id",
+          "type": "number",
+          "label": {
+            "en": "Chore number",
+            "fr": "Numéro de la tâche",
+            "de": "Nummer der Aufgabe",
+            "es": "Número de la tarea"
+          }
+        },
+        {
+          "key": "completed_by",
+          "type": "string",
+          "label": {
+            "en": "Done by",
+            "fr": "Faite par",
+            "de": "Erledigt von",
+            "es": "Hecha por"
+          }
+        },
+        {
+          "key": "on_time",
+          "type": "boolean",
+          "label": {
+            "en": "Done on time",
+            "fr": "Faite à temps",
+            "de": "Rechtzeitig erledigt",
+            "es": "Hecha a tiempo"
+          }
+        },
+        {
+          "key": "from_gladys",
+          "type": "boolean",
+          "label": {
+            "en": "Marked done from Gladys",
+            "fr": "Marquée faite depuis Gladys",
+            "de": "Über Gladys erledigt",
+            "es": "Marcada como hecha desde Gladys"
+          }
         }
       ]
     }
   ],
   "scene_actions": [
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+      "key": "complete_chore",
+      "label": {
+        "en": "Mark a Donetick chore done",
+        "fr": "Marquer une tâche Donetick comme faite",
+        "de": "Donetick-Aufgabe als erledigt markieren",
+        "es": "Marcar una tarea de Donetick como hecha"
       },
-      "timeout_seconds": 15,
+      "description": {
+        "en": "Marks a chore done now, as the user of the access token.",
+        "fr": "Marque une tâche comme faite maintenant, au nom de l'utilisateur du jeton d'accès.",
+        "de": "Markiert eine Aufgabe jetzt als erledigt, im Namen des Benutzers des Zugriffstokens.",
+        "es": "Marca una tarea como hecha ahora, en nombre del usuario del token de acceso."
+      },
+      "timeout_seconds": 20,
       "fields": [
         {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
+          "key": "chore",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "Chore name or number (#12)",
+            "fr": "Nom ou numéro de la tâche (#12)",
+            "de": "Name oder Nummer der Aufgabe (#12)",
+            "es": "Nombre o número de la tarea (#12)"
+          },
+          "description": {
+            "en": "The name as written in Donetick (case and accents ignored), or its number.",
+            "fr": "Le nom tel qu'écrit dans Donetick (majuscules et accents ignorés), ou son numéro.",
+            "de": "Der Name wie in Donetick geschrieben (Groß- und Kleinschreibung und Akzente egal) oder ihre Nummer.",
+            "es": "El nombre tal como está escrito en Donetick (sin distinguir mayúsculas ni acentos), o su número."
+          }
         }
       ],
       "outputs": [
         {
-          "key": "signalled",
+          "key": "chore",
+          "type": "string",
+          "label": {
+            "en": "Chore",
+            "fr": "Tâche",
+            "de": "Aufgabe",
+            "es": "Tarea"
+          }
+        },
+        {
+          "key": "chore_id",
+          "type": "number",
+          "label": {
+            "en": "Chore number",
+            "fr": "Numéro de la tâche",
+            "de": "Nummer der Aufgabe",
+            "es": "Número de la tarea"
+          }
+        },
+        {
+          "key": "pending_approval",
           "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "label": {
+            "en": "Waiting for approval",
+            "fr": "En attente de validation",
+            "de": "Wartet auf Freigabe",
+            "es": "Pendiente de aprobación"
+          }
+        },
+        {
+          "key": "next_due_date",
+          "type": "string",
+          "label": {
+            "en": "Next due date (ISO 8601)",
+            "fr": "Prochaine échéance (ISO 8601)",
+            "de": "Nächste Fälligkeit (ISO 8601)",
+            "es": "Próximo vencimiento (ISO 8601)"
+          }
         }
       ]
     }
   ],
   "widgets": [
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "chores_today",
+      "label": {
+        "en": "Today's chores",
+        "fr": "Tâches du jour",
+        "de": "Heutige Aufgaben",
+        "es": "Tareas del día"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "Chores left to do today, overdue first, with a button to mark each one done.",
+        "fr": "Les tâches à faire aujourd'hui, en retard d'abord, avec un bouton pour les marquer faites.",
+        "de": "Heute noch zu erledigende Aufgaben, überfällige zuerst, mit einer Taste zum Erledigen.",
+        "es": "Tareas pendientes de hoy, atrasadas primero, con un botón para marcarlas como hechas."
+      },
+      "icon": "check-square",
+      "action_timeout_seconds": 20,
+      "settings": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "required": false,
+          "label": {
+            "en": "Member (empty: household)",
+            "fr": "Membre (vide : tout le foyer)",
+            "de": "Mitglied (leer: ganzer Haushalt)",
+            "es": "Miembro (vacío: todo el hogar)"
+          },
+          "description": {
+            "en": "A member device shows only the chores assigned to that member.",
+            "fr": "Un appareil de membre ne montre que les tâches assignées à ce membre.",
+            "de": "Ein Mitgliedsgerät zeigt nur die diesem Mitglied zugewiesenen Aufgaben.",
+            "es": "Un dispositivo de miembro muestra solo las tareas asignadas a ese miembro."
+          }
+        }
+      ]
     }
   ]
 }

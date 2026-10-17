@@ -1,0 +1,32 @@
+{
+  "res": [
+    {
+      "id": 1,
+      "userId": 1,
+      "circleId": 1,
+      "role": "admin",
+      "isActive": true,
+      "createdAt": "2026-10-17T10:54:18.529031379Z",
+      "updatedAt": "2026-10-17T10:54:18.529031473Z",
+      "points": 0,
+      "pointsRedeemed": 0,
+      "username": "alice",
+      "displayName": "Alice",
+      "image": ""
+    },
+    {
+      "id": 3,
+      "userId": 2,
+      "circleId": 1,
+      "role": "member",
+      "isActive": true,
+      "createdAt": "2026-10-17T10:54:27.667136959Z",
+      "updatedAt": "2026-10-17T10:54:36.400045791Z",
+      "points": 0,
+      "pointsRedeemed": 0,
+      "username": "bobby",
+      "displayName": "Bob",
+      "image": ""
+    }
+  ]
+}

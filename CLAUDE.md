@@ -16,8 +16,8 @@ its only runtime dependency. It started from the official JavaScript template.
 ```bash
 npm install
 npm test                                  # node --test, the built-in runner
-node --test test/devices.test.js          # one file
-node --test --test-name-pattern "plug"    # tests whose name matches
+node --test test/hub.test.js              # one file
+node --test --test-name-pattern "widget"  # tests whose name matches
 npm run lint                              # ESLint
 npm run format:check                      # Prettier, as the CI runs it
 npm run format                            # Prettier, fix in place
@@ -31,16 +31,22 @@ pushing.
 ## Architecture
 
 ```
-index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
+index.js                          SDK wiring only: src/app.js registers the handlers before connect()
+src/app.js                        every SDK handler -> the hub (also used by the tests)
+src/hub.js                        reading timer, states, scene events, completion, deduplicated logs
+src/devices.js                    household and member devices: features, names (4 languages), states
+src/donetick/client.js            Donetick API client (/api/v1, `secretkey` header), errors by kind
+src/donetick/http.js              node:http/https request (self-signed certificates on request)
+src/donetick/model.js             chores, members, history; local day; counters; chore lookup
+src/scenes.js                     scene action `complete_chore` (manifest `scene_actions`)
+src/widgets.js                    dashboard widget `chores_today` (manifest `widgets`)
+src/texts.js                      connection, error, report, action and toast texts (4 languages)
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
+src/store.js                      /data/donetick-state.json (chores announced, history seen)
 gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
+docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys (en and fr mandatory)
 test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
+                                  and helpers/fakeDonetick.js (built from test/fixtures/donetick)
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -70,8 +76,10 @@ test/                             node --test, against the SDK's fake Gladys (in
   `type: "provider"`: 5.1.0). `test/manifest.test.js` ties the manifest to the
   code (defaults, action, scene and widget handlers): change both sides
   together.
-- **User-facing text** is bilingual (English and French): action messages,
-  manifest texts, and `docs/en.md` / `docs/fr.md`, kept in sync.
+- **User-facing text** exists in English, French, German and Spanish: action
+  messages, widget content, feature names, manifest texts, and
+  `docs/en.md`, `docs/fr.md`, `docs/de.md`, `docs/es.md`, kept in sync
+  (`test/i18n.test.js` checks the languages and the doc sections).
 - **Style.** Prettier formats, ESLint catches mistakes. Comments explain why,
   in English. Tests never touch the network.
 
@@ -197,6 +205,61 @@ code de ce dépôt. Compléter ce fichier quand un nouveau piège est découvert
 - Les filtres de scène ne font qu'égalité et appartenance : un seuil reste le travail d'un capteur.
 - **Les clés de widgets, de déclencheurs et d'actions sont figées une fois publiées.**
 - `gladys_version` `>=5.1.0` dès qu'il y a widgets, déclencheurs ou actions de scène.
+
+## Donetick (propre à ce dépôt)
+
+- **Routes** (vérifiées dans le source de `donetick/donetick`, `internal/chore/handler.go`,
+  `internal/circle/handler.go`, `internal/auth/`, et sur un vrai serveur en Docker le 17/10/2026) :
+  `GET /api/v1/chores/` → `{ res: Chore[] }` (actives seulement, triées par échéance, `null` en
+  tête) ; `GET /api/v1/chores/history?limit=<jours>&members=true` → historique du cercle mis à
+  jour depuis N jours ; `GET /api/v1/circles/members` ; `POST /api/v1/chores/:id/do`. Le jeton
+  d'accès (`dt_…`, Settings → Access tokens) passe dans l'en-tête **`secretkey`** : le
+  `MultiAuthMiddleware` de `/api/v1` l'accepte comme un JWT.
+- **Pas l'API « externe » `/eapi/v1/chore`** : sa complétion (`/:id/complete`) et `/eapi/v1/circle`
+  exigent un abonnement Plus (`RequirePlusMemberMiddleware`). En auto-hébergé tout utilisateur est
+  « Plus » (expiration fixée à 2999), mais pas sur donetick.com : `/api/v1` marche partout.
+- **Pièges vus sur le vrai serveur** : `GET /api/v1/chores` sans barre finale → **301** ;
+  `POST …/do` **sans corps JSON** → 400 « Invalid request » (envoyer `{}`) ; tâche inexistante →
+  **500** « Failed to retrieve chore » (pas 404) ; tout chemin inconnu répond **200 avec la page
+  HTML** de l'application (d'où le type d'erreur `not_donetick`) ; 401 au JSON
+  `{"error":"Authentication required…"}` pour un jeton absent ou faux.
+- **Qui peut valider** (`Chore.CanComplete`) : les assignés, n'importe quel membre pour une tâche
+  publique sans assigné, et **admin ou manager** du cercle pour toute tâche publique ; sinon 400
+  « User is not assigned to chore ». Une tâche à **validation** (`requireApproval`) passe en
+  attente : réponse `{ res, message: "Chore completion submitted for approval" }`, entrée
+  d'historique de statut 3, pas de « tâche faite » tant qu'un admin n'a pas approuvé.
+- **Prochaine échéance** : calculée depuis l'échéance, pas depuis la réalisation (sauf
+  `isRolling`) : une tâche à intervalle faite très en retard peut être **de nouveau en retard**
+  aussitôt, et le déclencheur « en retard » part alors pour la nouvelle occurrence (clé
+  `id@échéance`). Une tâche `once` faite devient inactive et sort de la liste : son nom est gardé
+  en mémoire pour l'événement « faite ».
+- **Statuts d'historique** : 0 démarrée, 1 faite, 2 passée, 3 en attente de validation, 4 refusée,
+  5 manquée, 6 replanifiée. Seul le **1** compte comme « faite ». L'historique du cercle est filtré **sur `updated_at`**
+  (fenêtre de N jours) : une ancienne entrée modifiée (note, date, `PUT …/history/:id`) y revient.
+  On ne déclenche donc que pour un `id` **supérieur au plus grand vu**, ou pour une entrée vue en
+  statut 3 puis approuvée (`ApproveChore` garde l'`id`). Une tâche en attente de validation a
+  `status: 3` : ni bouton dans le widget (un second appui crée une seconde demande), ni
+  déclencheur « en retard ».
+- **Bouton périmé** : le contenu du widget reste en cache jusqu'à 300 s ; le bouton porte
+  l'échéance vue (`params.due`) et l'action refuse si elle a changé, sinon un appui validerait
+  l'occurrence suivante. L'action de scène, elle, valide l'occurrence courante.
+- **Boucles** (doctrine du SDK : pas d'événement causé par une action reçue) : l'événement
+  « tâche faite » part aussi pour une validation depuis Gladys, voulu et documenté, avec la
+  variable `from_gladys` pour qu'une scène ignore ses propres validations.
+- **Premier démarrage** : ce qui est déjà en retard ou fait est mémorisé sans déclencher
+  (`scope` = adresse + cercle dans `/data/donetick-state.json`) ; changer d'instance ou de cercle
+  recommence ce marquage.
+- **Jour local** : `TZ` injecté par le superviseur ; `localDay` calcule minuit avec `Intl`
+  (changements d'heure compris, testé sur le 25/10/2026). Le minuteur se réveille à la prochaine
+  échéance et à minuit, au plus tôt 10 s après la lecture précédente.
+- États publiés par `publishChangedStates` du SDK (déduplication et battement de 12 h) ; le SDK
+  oublie les valeurs d'un appareil créé, `onDeviceCreated` republie donc tout.
+- Pas d'image Docker officielle avec un compte prêt : pour tester, créer le compte par
+  `POST /api/v1/auth/` (`username` 4-20 car., `password` 8+ car., `email`), puis
+  `POST /api/v1/auth/login` → `access_token`, puis `POST /api/v1/users/tokens {name}` (JWT) → jeton
+  `dt_…`. Un second membre : `POST /api/v1/circles/join?invite_code=…` puis
+  `PUT /api/v1/circles/members/requests/accept?requestId=…`. L'image écoute sur **2021** ; sa
+  première migration SQLite prend une à deux minutes sur un disque lent.
 
 ## Store
 

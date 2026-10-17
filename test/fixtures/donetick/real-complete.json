@@ -1,0 +1,31 @@
+{
+  "res": {
+    "completionActions": null,
+    "id": 1,
+    "name": "Sortir les poubelles",
+    "frequencyType": "weekly",
+    "frequency": 1,
+    "frequencyMetadata": null,
+    "nextDueDate": "2026-10-23T08:00:00Z",
+    "isRolling": false,
+    "assignedTo": 2,
+    "assignees": [{ "userId": 1 }, { "userId": 2 }],
+    "assignStrategy": "round_robin",
+    "isActive": true,
+    "notification": false,
+    "notificationMetadata": null,
+    "labelsV2": [],
+    "circleId": 1,
+    "createdAt": "2026-10-17T10:54:36.495331091Z",
+    "updatedAt": "2026-10-17T10:54:48.867858268Z",
+    "createdBy": 1,
+    "updatedBy": 1,
+    "thingChore": null,
+    "status": 0,
+    "priority": 0,
+    "subTasks": [],
+    "requireApproval": false,
+    "isPrivate": false,
+    "syncVersion": 7
+  }
+}

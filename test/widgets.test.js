@@ -118,3 +118,26 @@ test('degraded states: not configured, unknown member, outage', async (t) => {
   const down = await world(t, { config: { url: 'http://192.0.2.99', api_token: 'dt_x' } });
   assert.match(ofType(await content(down), 'text')[0].text, /does not answer/);
 });
+
+test('a button of a stale widget does not complete the next occurrence', async (t) => {
+  const w = await world(t);
+  const data = await content(w);
+  const bins = ofType(data, 'button').find((button) => button.action.params.id === 1);
+  w.server.completeAs(1, 2); // done in the Donetick app meanwhile
+  const ack = await w.fake.widgetAction('chores_today', bins.action.key, bins.action.params, {
+    settings: {},
+  });
+  assert.equal(ack.success, false);
+  assert.match(ack.error, /already done/);
+  assert.equal(w.server.chore(1).nextDueDate, '2026-10-23T08:00:00Z', 'not moved twice');
+});
+
+test('a chore waiting for approval has no button', async (t) => {
+  const w = await world(t);
+  w.server.chore(1).status = 3;
+  await w.hub.poll();
+  const data = await content(w, {}, 'fr');
+  assert.ok(!ofType(data, 'button').some((button) => button.action.params.id === 1));
+  const row = ofType(data, 'status')[0].items.find((item) => item.label === 'Sortir les poubelles');
+  assert.match(row.value, /^À valider/);
+});

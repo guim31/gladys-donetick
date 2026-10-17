@@ -57,6 +57,12 @@ export const TEXT = {
   toDo: { en: 'To do today', fr: 'À faire', de: 'Heute zu tun', es: 'Para hoy' },
   overdue: { en: 'Overdue', fr: 'En retard', de: 'Überfällig', es: 'Atrasadas' },
   next: { en: 'Next', fr: 'Prochaine', de: 'Nächste', es: 'Próxima' },
+  pending: {
+    en: 'Awaiting approval',
+    fr: 'À valider',
+    de: 'Wartet auf Freigabe',
+    es: 'Por aprobar',
+  },
 };
 
 const t = (text, language) => pick(text, language);
@@ -90,12 +96,16 @@ function formatDate(hub, ms, language) {
 
 /** The status row of a chore of the day: overdue, or its time; and who. */
 function choreRow(hub, chore, { now, showAssignee, language }) {
-  const late = chore.dueAt < now;
-  const when = late ? t(TEXT.overdue, language) : formatTime(hub, chore.dueAt, language);
+  const late = chore.dueAt < now && !chore.pendingApproval;
+  const when = chore.pendingApproval
+    ? t(TEXT.pending, language)
+    : late
+      ? t(TEXT.overdue, language)
+      : formatTime(hub, chore.dueAt, language);
   const who = showAssignee && chore.assignedTo !== null ? hub.memberName(chore.assignedTo) : null;
   return {
     label: fit(chore.name, 40),
-    icon: late ? 'alert-circle' : 'clock',
+    icon: chore.pendingApproval ? 'user-check' : late ? 'alert-circle' : 'clock',
     value: fit(who ? `${when} · ${who}` : when, 40),
     color: late ? WIDGET_COLORS.DANGER : WIDGET_COLORS.NEUTRAL,
   };
@@ -158,15 +168,21 @@ async function get(hub, { settings, language = 'en' }) {
       .map((chore) => choreRow(hub, chore, { now, showAssignee: !member, language })),
   });
   if (!hub.error) {
-    summary.today.slice(0, DONE_ACTIONS.length).forEach((chore, index) => {
-      components.push({
-        type: 'button',
-        label: fit(chore.name, 24),
-        icon: 'check',
-        style: 'secondary',
-        action: { key: DONE_ACTIONS[index], params: { id: chore.id } },
+    // A chore waiting for approval is done: no button (a second tap would
+    // file a second request). The due time travels with the button: a tap on
+    // a stale widget must not complete the next occurrence.
+    summary.today
+      .filter((chore) => !chore.pendingApproval)
+      .slice(0, DONE_ACTIONS.length)
+      .forEach((chore, index) => {
+        components.push({
+          type: 'button',
+          label: fit(chore.name, 24),
+          icon: 'check',
+          style: 'secondary',
+          action: { key: DONE_ACTIONS[index], params: { id: chore.id, due: chore.dueAt } },
+        });
       });
-    });
   }
   return { ttl_seconds: 300, components };
 }
@@ -175,7 +191,9 @@ async function action(hub, { actionKey, params = {} }) {
   if (!DONE_ACTIONS.includes(actionKey) || !Number.isInteger(params.id)) {
     throw new Error(`Unknown action ${actionKey}`);
   }
-  const result = await hub.complete(params.id);
+  const result = await hub.complete(params.id, {
+    expectedDue: Number.isFinite(params.due) ? params.due : undefined,
+  });
   return { message: DonetickHub.doneMessage(result) };
 }
 

@@ -85,7 +85,9 @@ The counters can also go on the dashboard as any device feature.
   who it is assigned to, the due date.
 - **Donetick chore done**: a chore was marked done, in Donetick or from
   Gladys. Filters: who did it (a member device), the chore name. Information:
-  the chore, its number, who did it, and whether it was done on time.
+  the chore, its number, who did it, whether it was done on time, and whether
+  it was marked done from Gladys (a scene that marks chores done can skip its
+  own completions with it, and never loop).
 
 What is already overdue or done when the integration first starts is known,
 not news: nothing fires for it. A restart does not announce a chore twice, and
@@ -140,4 +142,8 @@ when it starts again.
   chores already announced to scenes).
 - Donetick has its own request limit (300 per minute by default): the
   integration makes two or three requests per reading.
+- A chore waiting for approval shows _Awaiting approval_ in the widget,
+  without button. A widget button refuses a chore already done meanwhile.
+- A one-off chore done while the integration is stopped is announced by its
+  number (`#12`), its name being gone from Donetick's list.
 - Not affiliated with Donetick.

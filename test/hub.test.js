@@ -126,6 +126,7 @@ test('a chore done in Donetick fires "chore done" and moves the counters', async
     completed_by: 'Bob',
     member: memberId(w.gladys, BOB).device,
     on_time: false,
+    from_gladys: false,
   });
   // An interval chore moves from its due date (14/10 + 3 days): still overdue.
   assert.deepEqual(counters(w, householdId(w.gladys)), {
@@ -177,6 +178,7 @@ test('the scene action marks a chore done by name, case and accents ignored', as
   assert.equal(counters(w, householdId(w.gladys)).done, 1);
   assert.equal(w.fake.sceneEvents.at(-1).key, 'chore_completed');
   assert.equal(w.fake.sceneEvents.at(-1).data.completed_by, 'Alice');
+  assert.equal(w.fake.sceneEvents.at(-1).data.from_gladys, true, 'a scene can skip its own');
 });
 
 test('the scene action by number, and its errors', async (t) => {
@@ -291,4 +293,47 @@ test('turning the member devices off leaves the household only', async (t) => {
     w.fake.discoveredDevices.map((device) => device.external_id),
     [householdId(w.gladys).device],
   );
+});
+
+test('an old completion edited in Donetick does not fire again', async (t) => {
+  const clock = createClock();
+  const w = await world(t, { clock });
+  const old = w.server.completeAs(3, BOB, START - 3 * 24 * HOUR);
+  old.updatedAt = new Date(START - 3 * 24 * HOUR).toISOString();
+  w.server.nextHistoryId = 200;
+  await w.hub.poll(); // out of the window: unseen
+  const seen = w.server.completeAs(1, ALICE);
+  await w.hub.poll();
+  const completed = () => w.fake.sceneEvents.filter((event) => event.key === 'chore_completed');
+  assert.equal(completed().length, 1);
+  // A note added to last week's entry: back in the window, same old id.
+  old.updatedAt = new Date(clock.now()).toISOString();
+  old.id = 50;
+  await w.hub.poll();
+  assert.deepEqual(
+    completed().map((event) => event.data.chore_id),
+    [seen.choreId],
+  );
+});
+
+test('a completion waiting for approval fires once approved', async (t) => {
+  const w = await world(t);
+  w.server.chore(2).requireApproval = true;
+  w.server.chore(2).status = 3;
+  const entry = w.server.completeAs(2, BOB);
+  await w.hub.poll();
+  assert.equal(w.fake.sceneEvents.length, 0);
+  entry.status = 1; // approved by an admin: same entry
+  await w.hub.poll();
+  assert.equal(w.fake.sceneEvents.length, 1);
+  assert.equal(w.fake.sceneEvents[0].data.chore, 'Arroser les plantes');
+});
+
+test('a reading of the old instance during a reconfiguration is dropped', async (t) => {
+  const w = await world(t);
+  const reading = w.hub.poll();
+  await w.fake.configUpdated({ ...w.fake.config, url: 'http://192.0.2.99:2021' });
+  await reading;
+  assert.equal(w.hub.circleId, null, 'nothing of the old instance kept');
+  assert.equal(w.fake.connectionStatus.connected, false);
 });

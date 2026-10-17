@@ -92,7 +92,9 @@ Die Zähler können auch wie jede Gerätefunktion aufs Dashboard.
 - **Donetick-Aufgabe erledigt**: Eine Aufgabe wurde als erledigt markiert, in
   Donetick oder über Gladys. Filter: wer sie erledigt hat (ein
   Mitgliedsgerät), der Name der Aufgabe. Informationen: die Aufgabe, ihre
-  Nummer, wer sie erledigt hat und ob sie rechtzeitig erledigt wurde.
+  Nummer, wer sie erledigt hat, ob sie rechtzeitig erledigt wurde und ob sie
+  über Gladys erledigt wurde (eine Szene, die Aufgaben erledigt, kann so ihre
+  eigenen Erledigungen ignorieren und nie in eine Schleife geraten).
 
 Was beim ersten Start der Integration schon überfällig oder erledigt ist, ist
 bekannt, nicht neu: Dafür wird nichts ausgelöst. Ein Neustart meldet keine
@@ -155,4 +157,10 @@ Integration gestoppt war, wird beim Neustart gemeldet.
   schon an Szenen gemeldeten Aufgaben).
 - Donetick hat ein eigenes Anfragelimit (standardmäßig 300 pro Minute): Die
   Integration stellt zwei bis drei Anfragen pro Abfrage.
+- Eine Aufgabe, die auf Freigabe wartet, zeigt im Widget _Wartet auf
+  Freigabe_, ohne Taste. Eine Widget-Taste lehnt eine inzwischen erledigte
+  Aufgabe ab.
+- Eine einmalige Aufgabe, die erledigt wurde, während die Integration
+  gestoppt war, wird mit ihrer Nummer (`#12`) gemeldet, da ihr Name nicht
+  mehr in der Liste von Donetick steht.
 - Keine Verbindung zu Donetick.

@@ -91,7 +91,9 @@ fonctionnalité d'appareil.
 - **Tâche Donetick faite** : une tâche a été marquée comme faite, dans Donetick
   ou depuis Gladys. Filtres : qui l'a faite (un appareil de membre), le nom de
   la tâche. Informations : la tâche, son numéro, qui l'a faite, et si elle a
-  été faite à temps.
+  été faite à temps, et si elle a été marquée faite depuis Gladys (une scène
+  qui marque des tâches comme faites peut ainsi ignorer les siennes, sans
+  jamais boucler).
 
 Ce qui est déjà en retard ou fait au premier démarrage de l'intégration est
 connu, pas nouveau : rien ne se déclenche pour cela. Un redémarrage n'annonce
@@ -154,4 +156,8 @@ l'intégration était arrêtée est annoncée à son redémarrage.
   (les tâches déjà annoncées aux scènes).
 - Donetick a sa propre limite de requêtes (300 par minute par défaut) :
   l'intégration fait deux ou trois requêtes par lecture.
+- Une tâche en attente de validation s'affiche _À valider_ dans le widget,
+  sans bouton. Un bouton du widget refuse une tâche déjà faite entre-temps.
+- Une tâche unique faite pendant que l'intégration est arrêtée est annoncée
+  par son numéro (`#12`), son nom ayant quitté la liste de Donetick.
 - Sans lien avec Donetick.

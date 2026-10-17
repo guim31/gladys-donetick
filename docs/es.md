@@ -91,7 +91,9 @@ dispositivo.
 - **Tarea de Donetick hecha**: una tarea se ha marcado como hecha, en Donetick
   o desde Gladys. Filtros: quién la ha hecho (un dispositivo de miembro), el
   nombre de la tarea. Información: la tarea, su número, quién la ha hecho y si
-  se hizo a tiempo.
+  se hizo a tiempo, y si se marcó como hecha desde Gladys (una escena que
+  marca tareas como hechas puede así ignorar las suyas, sin entrar nunca en
+  bucle).
 
 Lo que ya está atrasado o hecho en el primer arranque de la integración es
 conocido, no novedad: no se dispara nada por ello. Un reinicio no anuncia dos
@@ -153,4 +155,8 @@ detenida se anuncia al volver a arrancar.
   (las tareas ya anunciadas a las escenas).
 - Donetick tiene su propio límite de solicitudes (300 por minuto por
   defecto): la integración hace dos o tres solicitudes por lectura.
+- Una tarea pendiente de aprobación aparece como _Por aprobar_ en el widget,
+  sin botón. Un botón del widget rechaza una tarea ya hecha entretanto.
+- Una tarea única hecha mientras la integración estaba detenida se anuncia
+  por su número (`#12`), ya que su nombre ha salido de la lista de Donetick.
 - Sin relación con Donetick.

@@ -15,6 +15,9 @@
 // -----------------------------------------------------------------------------
 
 export const HISTORY_COMPLETED = 1;
+export const HISTORY_PENDING_APPROVAL = 3;
+// `status` of a chore whose completion waits for an admin.
+export const CHORE_PENDING_APPROVAL = 3;
 
 const time = (value) => {
   if (typeof value !== 'string' || value === '') {
@@ -27,7 +30,7 @@ const time = (value) => {
 /**
  * @param {unknown[]} raw `res` of GET /api/v1/chores/
  * @returns {Array<{ id: number, name: string, dueAt: number|null, assignedTo: number|null,
- *   frequencyType: string, requireApproval: boolean }>}
+ *   frequencyType: string, requireApproval: boolean, pendingApproval: boolean }>}
  */
 export function parseChores(raw) {
   return (Array.isArray(raw) ? raw : [])
@@ -41,6 +44,7 @@ export function parseChores(raw) {
         Number.isInteger(chore.assignedTo) && chore.assignedTo > 0 ? chore.assignedTo : null,
       frequencyType: typeof chore.frequencyType === 'string' ? chore.frequencyType : '',
       requireApproval: chore.requireApproval === true,
+      pendingApproval: chore.status === CHORE_PENDING_APPROVAL,
     }))
     .sort((a, b) => (a.dueAt ?? Infinity) - (b.dueAt ?? Infinity) || a.id - b.id);
 }
@@ -64,17 +68,24 @@ export function parseMembers(raw) {
 }
 
 /**
- * Completed entries only.
+ * Completed entries, and those waiting for approval (an approval turns the
+ * same entry, same id, into a completed one).
  * @param {unknown[]} raw `res` of GET /api/v1/chores/history
- * @returns {Array<{ id: number, choreId: number, completedBy: number|null,
+ * @returns {Array<{ id: number, choreId: number, status: number, completedBy: number|null,
  *   performedAt: number|null, dueAt: number|null }>}
  */
 export function parseHistory(raw) {
   return (Array.isArray(raw) ? raw : [])
-    .filter((entry) => entry && Number.isInteger(entry.id) && entry.status === HISTORY_COMPLETED)
+    .filter(
+      (entry) =>
+        entry &&
+        Number.isInteger(entry.id) &&
+        (entry.status === HISTORY_COMPLETED || entry.status === HISTORY_PENDING_APPROVAL),
+    )
     .map((entry) => ({
       id: entry.id,
       choreId: Number.isInteger(entry.choreId) ? entry.choreId : null,
+      status: entry.status,
       completedBy: Number.isInteger(entry.completedBy) ? entry.completedBy : null,
       performedAt: time(entry.performedAt),
       dueAt: time(entry.dueDate),
@@ -118,7 +129,13 @@ function offsetAt(ms, timeZone) {
 function localMidnight(year, month, day, timeZone) {
   const guess = Date.UTC(year, month - 1, day);
   const first = guess - offsetAt(guess, timeZone);
-  return guess - offsetAt(first, timeZone);
+  let start = guess - offsetAt(first, timeZone);
+  // Where the clocks jump at midnight (Chile, Cuba), 00:00 does not exist and
+  // the instant found is 23:00 the day before: the day starts an hour later.
+  if (zonedParts(start, timeZone).day !== day) {
+    start += 60 * 60_000;
+  }
+  return start;
 }
 
 /** A time zone Intl knows, else the one of the process. */
@@ -162,6 +179,7 @@ export function summarize(chores, history, { now, day, userId = null }) {
   const today = dated.filter((chore) => chore.dueAt < day.end);
   const done = history.filter(
     (entry) =>
+      entry.status === HISTORY_COMPLETED &&
       entry.performedAt !== null &&
       entry.performedAt >= day.start &&
       entry.performedAt < day.end &&

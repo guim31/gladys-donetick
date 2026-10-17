@@ -234,8 +234,18 @@ code de ce dépôt. Compléter ce fichier quand un nouveau piège est découvert
   `id@échéance`). Une tâche `once` faite devient inactive et sort de la liste : son nom est gardé
   en mémoire pour l'événement « faite ».
 - **Statuts d'historique** : 0 démarrée, 1 faite, 2 passée, 3 en attente de validation, 4 refusée,
-  5 manquée, 6 replanifiée. Seul le **1** compte comme « faite » ; les entrées sont suivies par
-  `id` (une approbation change le statut d'une entrée existante).
+  5 manquée, 6 replanifiée. Seul le **1** compte comme « faite ». L'historique du cercle est filtré **sur `updated_at`**
+  (fenêtre de N jours) : une ancienne entrée modifiée (note, date, `PUT …/history/:id`) y revient.
+  On ne déclenche donc que pour un `id` **supérieur au plus grand vu**, ou pour une entrée vue en
+  statut 3 puis approuvée (`ApproveChore` garde l'`id`). Une tâche en attente de validation a
+  `status: 3` : ni bouton dans le widget (un second appui crée une seconde demande), ni
+  déclencheur « en retard ».
+- **Bouton périmé** : le contenu du widget reste en cache jusqu'à 300 s ; le bouton porte
+  l'échéance vue (`params.due`) et l'action refuse si elle a changé, sinon un appui validerait
+  l'occurrence suivante. L'action de scène, elle, valide l'occurrence courante.
+- **Boucles** (doctrine du SDK : pas d'événement causé par une action reçue) : l'événement
+  « tâche faite » part aussi pour une validation depuis Gladys, voulu et documenté, avec la
+  variable `from_gladys` pour qu'une scène ignore ses propres validations.
 - **Premier démarrage** : ce qui est déjà en retard ou fait est mémorisé sans déclencher
   (`scope` = adresse + cercle dans `/data/donetick-state.json`) ; changer d'instance ou de cercle
   recommence ce marquage.

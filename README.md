@@ -60,12 +60,12 @@ The integration uses the routes of the Donetick web app, with the access
 token in the `secretkey` header (checked in the Donetick source and on a real
 server):
 
-| Request                                               | Use                                  |
-| ----------------------------------------------------- | ------------------------------------ |
-| `GET /api/v1/chores/`                                 | active chores, due dates, assignees  |
-| `GET /api/v1/chores/history?limit=1&members=true`     | completions of the last day (circle) |
-| `GET /api/v1/circles/members`                         | members and circle id (every hour)   |
-| `POST /api/v1/chores/{id}/do` with the JSON body `{}` | mark a chore done, as the token user |
+| Request                                               | Use                                       |
+| ----------------------------------------------------- | ----------------------------------------- |
+| `GET /api/v1/chores/`                                 | active chores, due dates, assignees       |
+| `GET /api/v1/chores/history?limit=2&members=true`     | completions of the last two days (circle) |
+| `GET /api/v1/circles/members`                         | members and circle id (every hour)        |
+| `POST /api/v1/chores/{id}/do` with the JSON body `{}` | mark a chore done, as the token user      |
 
 The "external API" (`/eapi/v1/chore`) was left aside: on donetick.com, its
 completion route is reserved to Plus subscribers, while `/api/v1` accepts the

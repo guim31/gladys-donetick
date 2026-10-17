@@ -122,7 +122,7 @@ test('the client sends the token in the secretkey header, on the routes of the s
     [
       ['POST', '/api/v1/chores/1/do', 'dt_x'],
       ['GET', '/api/v1/chores/', 'dt_x'],
-      ['GET', '/api/v1/chores/history?limit=1&members=true', 'dt_x'],
+      ['GET', '/api/v1/chores/history?limit=2&members=true', 'dt_x'],
       ['GET', '/api/v1/circles/members', 'dt_x'],
     ],
   );
@@ -160,6 +160,7 @@ test('the real answers parse', () => {
   );
   // Skipped, pending approval, rejected… are not completions.
   assert.deepEqual(parseHistory([{ id: 9, choreId: 1, status: 2 }]), []);
+  assert.equal(parseHistory([{ id: 9, choreId: 1, status: 3 }])[0].status, 3);
 });
 
 test('the local day follows the time zone, including the DST change', () => {
@@ -170,6 +171,9 @@ test('the local day follows the time zone, including the DST change', () => {
   const change = localDay(Date.UTC(2026, 9, 25, 12, 0), 'Europe/Paris');
   assert.equal(new Date(change.start).toISOString(), '2026-10-24T22:00:00.000Z');
   assert.equal(new Date(change.end).toISOString(), '2026-10-25T23:00:00.000Z');
+  // Chile jumps from 00:00 to 01:00: the day starts at 01:00 local.
+  const santiago = localDay(Date.UTC(2026, 8, 6, 12, 0), 'America/Santiago');
+  assert.equal(new Date(santiago.start).toISOString(), '2026-09-06T04:00:00.000Z');
   const auckland = localDay(Date.UTC(2026, 9, 17, 12, 0), 'Pacific/Auckland');
   assert.equal(new Date(auckland.start).toISOString(), '2026-10-17T11:00:00.000Z');
 });

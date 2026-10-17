@@ -16,6 +16,8 @@ import { hostOf } from './config.js';
 import { buildHousehold, buildMember, featureStates, householdIds, memberIds } from './devices.js';
 import { DonetickClient, DonetickError, ERROR_KINDS } from './donetick/client.js';
 import {
+  HISTORY_COMPLETED,
+  HISTORY_PENDING_APPROVAL,
   findChore,
   localDay,
   parseChores,
@@ -58,6 +60,11 @@ export const HUB_TIMINGS = {
 };
 
 const MAX_REMEMBERED = 500;
+// A completion seen this soon after Gladys marked the chore done is Gladys' own.
+const OWN_COMPLETION_MS = 30 * 60_000;
+// The reading after a completion is awaited at most this long: the scene
+// action and the widget button answer within their 20 s.
+const REFRESH_WAIT_MS = 3_000;
 
 export class DonetickHub {
   /**
@@ -81,7 +88,9 @@ export class DonetickHub {
     this.config = null;
     this.client = null;
     this.reset();
-    this.saved = { scope: null, announcedOverdue: [], seenCompleted: [] };
+    this.saved = { scope: null, announcedOverdue: [], maxHistoryId: 0, pendingHistory: [] };
+    /** Chores marked done from Gladys, by id → time: `from_gladys` of the event. */
+    this.ownCompletions = new Map();
     this.connection = null;
     this.devicesSignature = null;
     this.widgetSignature = null;
@@ -136,9 +145,14 @@ export class DonetickHub {
   async start(config) {
     const saved = await this.store.load();
     this.saved = {
-      scope: typeof saved.scope === 'string' ? saved.scope : null,
+      // A file without the history mark is not trusted: start over, silently.
+      scope:
+        typeof saved.scope === 'string' && Number.isInteger(saved.maxHistoryId)
+          ? saved.scope
+          : null,
       announcedOverdue: Array.isArray(saved.announcedOverdue) ? saved.announcedOverdue : [],
-      seenCompleted: Array.isArray(saved.seenCompleted) ? saved.seenCompleted : [],
+      maxHistoryId: Number.isInteger(saved.maxHistoryId) ? saved.maxHistoryId : 0,
+      pendingHistory: Array.isArray(saved.pendingHistory) ? saved.pendingHistory : [],
     };
     await this.reconfigure(config);
   }
@@ -196,17 +210,19 @@ export class DonetickHub {
   }
 
   /** The interval, shortened to the next due time or local midnight. */
-  nextDelay() {
+  nextDelay(readAt = this.now()) {
     if (this.error) {
       return Math.min(this.config.pollIntervalMs, this.timings.retryMs);
     }
     const now = this.now();
-    const moments = [localDay(now, this.timeZone).end];
-    const upcoming = this.chores.find((chore) => chore.dueAt !== null && chore.dueAt > now);
+    // `readAt`: a due time that passed during the reading is still ahead of it.
+    const moments = [localDay(readAt, this.timeZone).end];
+    const upcoming = this.chores.find((chore) => chore.dueAt !== null && chore.dueAt > readAt);
     if (upcoming) {
       moments.push(upcoming.dueAt);
     }
-    const wake = Math.min(...moments) - now + this.timings.wakeSlackMs;
+    const ahead = moments.filter((moment) => moment + this.timings.wakeSlackMs > now);
+    const wake = ahead.length === 0 ? 0 : Math.min(...ahead) - now + this.timings.wakeSlackMs;
     return Math.max(this.timings.minDelayMs, Math.min(this.config.pollIntervalMs, wake));
   }
 
@@ -215,10 +231,11 @@ export class DonetickHub {
   /** One reading at a time: a call during a reading waits for it, then reads. */
   poll(options = {}) {
     const run = async () => {
+      const readAt = this.now();
       try {
         await this.read(options);
       } finally {
-        this.schedule(this.nextDelay());
+        this.schedule(this.nextDelay(readAt));
       }
     };
     this.polling = (this.polling ?? Promise.resolve()).catch(() => {}).then(run);
@@ -231,14 +248,20 @@ export class DonetickHub {
       return;
     }
     const now = this.now();
+    const { client } = this;
     try {
       const wantMembers =
         members || this.circleId === null || now - this.membersAt >= this.timings.membersMs;
       const [chores, history, memberList] = await Promise.all([
-        this.client.chores(),
-        this.client.history(),
-        wantMembers ? this.client.members() : null,
+        client.chores(),
+        client.history(),
+        wantMembers ? client.members() : null,
       ]);
+      if (client !== this.client) {
+        // The configuration changed during the reading: these are the old
+        // instance's chores; the new one is being read.
+        return;
+      }
       this.chores = parseChores(chores);
       this.history = parseHistory(history);
       if (memberList) {
@@ -255,6 +278,9 @@ export class DonetickHub {
       this.readAt = now;
       this.recovered(now);
     } catch (err) {
+      if (client !== this.client) {
+        return;
+      }
       this.failed(err, now);
     }
     if (this.circleId !== null) {
@@ -473,9 +499,13 @@ export class DonetickHub {
   async fireEvents(now) {
     const scope = `${this.config.url}|${this.circleId}`;
     const overdue = this.chores
-      .filter((chore) => chore.dueAt !== null && chore.dueAt < now)
+      // A completion waiting for approval is done, as far as the members know.
+      .filter((chore) => chore.dueAt !== null && chore.dueAt < now && !chore.pendingApproval)
       .map((chore) => ({ chore, key: `${chore.id}@${chore.dueAt}` }));
-    const completed = this.history;
+    const maxId = this.history.reduce((max, entry) => Math.max(max, entry.id), 0);
+    const pendingNow = this.history
+      .filter((entry) => entry.status === HISTORY_PENDING_APPROVAL)
+      .map((entry) => entry.id);
 
     if (this.saved.scope !== scope) {
       // First reading of this instance: what is already overdue or done is
@@ -483,25 +513,38 @@ export class DonetickHub {
       this.saved = {
         scope,
         announcedOverdue: overdue.map(({ key }) => key),
-        seenCompleted: completed.map((entry) => entry.id),
+        maxHistoryId: maxId,
+        pendingHistory: pendingNow,
       };
       this.store.save(this.saved);
       return;
     }
 
     const announced = new Set(this.saved.announcedOverdue);
-    const seen = new Set(this.saved.seenCompleted);
+    const pendingBefore = new Set(this.saved.pendingHistory);
     const fresh = overdue.filter(({ key }) => !announced.has(key));
-    const done = completed.filter((entry) => !seen.has(entry.id));
-
-    const nextAnnounced = overdue.map(({ key }) => key);
-    // History entries leave the one-day window: keep those still in it.
-    const nextSeen = completed.map((entry) => entry.id);
-    if (
-      JSON.stringify(nextAnnounced) !== JSON.stringify(this.saved.announcedOverdue) ||
-      JSON.stringify(nextSeen) !== JSON.stringify(this.saved.seenCompleted)
-    ) {
-      this.saved = { scope, announcedOverdue: nextAnnounced, seenCompleted: nextSeen };
+    // New entries only (an old entry edited in Donetick comes back in the
+    // window: its id is below the highest seen), or an approval of an entry
+    // that was waiting (same id, now completed).
+    const done = this.history.filter(
+      (entry) =>
+        entry.status === HISTORY_COMPLETED &&
+        (entry.id > this.saved.maxHistoryId || pendingBefore.has(entry.id)),
+    );
+    const next = {
+      scope,
+      announcedOverdue: overdue.map(({ key }) => key),
+      maxHistoryId: Math.max(this.saved.maxHistoryId, maxId),
+      pendingHistory: [
+        ...new Set([
+          ...pendingNow.filter((id) => id > this.saved.maxHistoryId || pendingBefore.has(id)),
+          // Still waiting but out of the window: kept until it comes back.
+          ...[...pendingBefore].filter((id) => !this.history.some((entry) => entry.id === id)),
+        ]),
+      ].slice(-MAX_REMEMBERED),
+    };
+    if (JSON.stringify(next) !== JSON.stringify(this.saved)) {
+      this.saved = next;
       this.store.save(this.saved);
     }
 
@@ -517,6 +560,11 @@ export class DonetickHub {
         due_date: new Date(chore.dueAt).toISOString(),
       });
     }
+    for (const [id, at] of this.ownCompletions) {
+      if (now - at > OWN_COMPLETION_MS) {
+        this.ownCompletions.delete(id);
+      }
+    }
     for (const entry of done) {
       await this.fire(TRIGGERS.COMPLETED, {
         chore: this.names.get(entry.choreId) ?? `#${entry.choreId}`,
@@ -530,7 +578,10 @@ export class DonetickHub {
           entry.dueAt === null || entry.performedAt === null
             ? true
             : entry.performedAt <= entry.dueAt,
+        // Lets a scene that marks chores done ignore its own completions (no loop).
+        from_gladys: this.ownCompletions.has(entry.choreId),
       });
+      this.ownCompletions.delete(entry.choreId);
     }
   }
 
@@ -547,9 +598,13 @@ export class DonetickHub {
 
   /**
    * Mark a chore done, by number or name, as the user of the API token.
+   * @param {string|number} query
+   * @param {object} [options]
+   * @param {number|null} [options.expectedDue] the due time the user saw (widget
+   *   button): a different one means this occurrence was already done.
    * @returns {Promise<{ chore: object, pendingApproval: boolean, nextDue: number|null }>}
    */
-  async complete(query) {
+  async complete(query, { expectedDue } = {}) {
     const language = this.language;
     if (!this.client) {
       throw new Error(pick(ACTION_TEXT.notConfigured, language));
@@ -565,7 +620,9 @@ export class DonetickHub {
         return new Error(pick(ACTION_TEXT.tooEarly, language), { cause: err });
       }
       const colon = language === 'fr' ? ' : ' : ': ';
-      return new Error(`Donetick${colon}${pick(ERROR_TEXT[err.kind], language)} (${err.message})`, {
+      // The status only: the server's own text stays in the logs.
+      const status = err.status ? ` (HTTP ${err.status})` : '';
+      return new Error(`Donetick${colon}${pick(ERROR_TEXT[err.kind], language)}${status}`, {
         cause: err,
       });
     };
@@ -579,17 +636,31 @@ export class DonetickHub {
         throw new Error(pick(ACTION_TEXT[reason], language));
       }
       chore = found.chore;
+      if (
+        (expectedDue !== undefined && chore.dueAt !== expectedDue) ||
+        (expectedDue !== undefined && chore.pendingApproval)
+      ) {
+        this.poll().catch(() => {});
+        throw new Error(pick(ACTION_TEXT.alreadyDone, language));
+      }
       result = await this.client.complete(chore.id);
+      this.ownCompletions.set(chore.id, this.now());
     } catch (err) {
       throw translate(err);
     }
     logger.info(
       `Chore #${chore.id} ${result.pendingApproval ? 'sent for approval' : 'marked done'} from Gladys`,
     );
-    // The counters, the widget and the "chore done" event follow at once.
-    await this.poll().catch(() => {});
-    const after = this.chores.find((item) => item.id === chore.id);
-    return { chore, pendingApproval: result.pendingApproval, nextDue: after?.dueAt ?? null };
+    // The counters, the widget and the "chore done" event follow at once,
+    // without holding the answer if Donetick is slow.
+    const refresh = this.poll().catch(() => {});
+    await Promise.race([refresh, new Promise((resolve) => setTimeout(resolve, REFRESH_WAIT_MS))]);
+    const next = Date.parse(result.chore?.nextDueDate ?? '');
+    return {
+      chore,
+      pendingApproval: result.pendingApproval,
+      nextDue: Number.isFinite(next) && result.chore?.isActive !== false ? next : null,
+    };
   }
 
   /** The toast of a completion, in the four languages. */

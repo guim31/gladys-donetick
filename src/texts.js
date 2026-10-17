@@ -133,6 +133,12 @@ export const ACTION_TEXT = {
     de: 'Donetick hat abgelehnt: Der Benutzer des Tokens ist dieser Aufgabe nicht zugewiesen.',
     es: 'Donetick lo ha rechazado: el usuario del token no está asignado a esta tarea.',
   },
+  alreadyDone: {
+    en: 'This chore was already done meanwhile: the list is refreshed.',
+    fr: 'Cette tâche a déjà été faite entre-temps : la liste est mise à jour.',
+    de: 'Diese Aufgabe wurde inzwischen schon erledigt: Die Liste wird aktualisiert.',
+    es: 'Esta tarea ya se ha hecho entretanto: la lista se actualiza.',
+  },
   tooEarly: {
     en: 'Donetick refused: the chore is not yet in its completion window.',
     fr: "Donetick a refusé : la tâche n'est pas encore dans sa période de réalisation.",

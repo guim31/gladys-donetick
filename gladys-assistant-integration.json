@@ -418,6 +418,16 @@
             "de": "Rechtzeitig erledigt",
             "es": "Hecha a tiempo"
           }
+        },
+        {
+          "key": "from_gladys",
+          "type": "boolean",
+          "label": {
+            "en": "Marked done from Gladys",
+            "fr": "Marquée faite depuis Gladys",
+            "de": "Über Gladys erledigt",
+            "es": "Marcada como hecha desde Gladys"
+          }
         }
       ]
     }

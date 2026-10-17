@@ -9,7 +9,7 @@
 // same token (MultiAuthMiddleware) for every account, self-hosted or not.
 //
 //   GET  /api/v1/chores/                          { res: Chore[] } active chores
-//   GET  /api/v1/chores/history?limit=1&members=true { res: History[] } last day
+//   GET  /api/v1/chores/history?limit=2&members=true { res: History[] } last day
 //   GET  /api/v1/circles/members                  { res: Member[] }
 //   POST /api/v1/chores/:id/do  (JSON body `{}`)  { res: Chore }
 //
@@ -125,9 +125,9 @@ export class DonetickClient {
     return Array.isArray(res) ? res : [];
   }
 
-  /** History entries of the whole circle, updated during the last day. */
+  /** History entries of the whole circle, updated during the last two days. */
   async history() {
-    const { res } = await this.call('/api/v1/chores/history?limit=1&members=true');
+    const { res } = await this.call('/api/v1/chores/history?limit=2&members=true');
     return Array.isArray(res) ? res : [];
   }
 

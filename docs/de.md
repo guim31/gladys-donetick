@@ -1,0 +1,158 @@
+# Donetick
+
+Hol die Hausarbeiten deines [Donetick](https://donetick.com) in Gladys: was
+heute noch zu tun ist, was überfällig ist, wer was macht. Ein Tipp auf dem
+Dashboard markiert eine Aufgabe als erledigt, eine Szene erinnert, wer im
+Rückstand ist, eine andere reagiert, wenn der Müll rausgebracht wurde.
+
+> **Rückmeldungen willkommen.** Diese Integration wurde mit einem echten
+> Donetick-Server getestet (Docker-Image `donetick/donetick`, Oktober 2026),
+> aber noch nicht im Alltag. Wenn etwas nicht wie beschrieben funktioniert,
+> melde es im [Gladys-Forum](https://community.gladysassistant.com) oder in den
+> [Issues](https://github.com/guim31/gladys-donetick/issues).
+
+## Was du brauchst
+
+- Gladys Assistant 5.1.0 oder neuer.
+- Ein **selbst gehostetes Donetick**, von Gladys aus erreichbar (das
+  Docker-Image lauscht auf Port 2021).
+- Ein **Zugriffstoken** eines Donetick-Benutzers. In Donetick: **Settings** →
+  **Access tokens** → **Generate new token**, gib ihm einen Namen (`Gladys`)
+  und kopiere das Token, das mit `dt_` beginnt: Donetick zeigt es nur einmal.
+
+Die Integration sieht die Aufgaben, die dieser Benutzer sieht (den ganzen
+Kreis, außer den privaten Aufgaben der anderen Mitglieder), und markiert
+Aufgaben **in seinem Namen** als erledigt. Wähle einen Benutzer, der Admin
+oder Manager des Kreises ist, wenn die Szenenaktion oder das Widget Aufgaben
+anderer Mitglieder erledigen sollen.
+
+## Einrichtung
+
+1. In Gladys: **Integrationen** → **Donetick** installieren.
+2. Fülle im Bildschirm **Konfiguration** aus:
+   - **Adresse**: die Adresse von Donetick, zum Beispiel
+     `http://192.168.1.20:2021`, oder `https://aufgaben.example.org` hinter
+     einem Reverse Proxy (ein Pfadpräfix wie `/donetick` bleibt erhalten);
+   - **Zugriffstoken**: das `dt_…`-Token.
+3. Optionen:
+   - **Ein Gerät pro Mitglied** (standardmäßig an): zusätzlich zum
+     Haushaltsgerät ein Gerät pro Mitglied des Kreises, für die ihm
+     zugewiesenen Aufgaben;
+   - **Selbstsignierte Zertifikate akzeptieren**: für eine `https://`-Adresse
+     mit selbstsigniertem Zertifikat, nur für deinen eigenen Server;
+   - **Aktualisierungsintervall**: 1 bis 10 Minuten (standardmäßig 2).
+     Fälligkeiten und Mitternacht werden unabhängig vom Intervall immer
+     pünktlich berücksichtigt;
+   - **Sprache der Funktionsnamen**: die Namen der Funktionen beim Hinzufügen
+     eines Geräts (standardmäßig Französisch) und die an Szenen gesendeten
+     Texte.
+4. Speichere und klicke auf **Verbindung testen**: Die Integration liest
+   Donetick und nennt die Zahl der aktiven Aufgaben und der Mitglieder.
+5. Füge im Tab **Entdecken** die gewünschten Geräte hinzu.
+
+## Geräte
+
+**Donetick** (der Haushalt) und, mit der Option, **Donetick _Mitglied_** für
+jedes Mitglied des Kreises. Jedes hat vier Funktionen:
+
+| Funktion                   | Was sie anzeigt                                                                                     |
+| -------------------------- | --------------------------------------------------------------------------------------------------- |
+| `Aufgaben für heute`       | aktive Aufgaben, die vor Mitternacht fällig sind, überfällige inklusive: was bis heute Abend bleibt |
+| `Überfällige Aufgaben`     | aktive Aufgaben, deren Fälligkeit vorbei ist                                                        |
+| `Heute erledigte Aufgaben` | heute erfasste Erledigungen (übersprungene Aufgaben zählen nicht)                                   |
+| `Nächste Aufgabe`          | der Name der Aufgabe mit der frühesten Fälligkeit, überfällige zuerst; `Keine`, wenn nichts ansteht |
+
+Auf einem Mitgliedsgerät zählen nur die dem Mitglied **zugewiesenen**
+Aufgaben, und `Heute erledigte Aufgaben` nur die, die **es selbst** erledigt
+hat. Aufgaben ohne Fälligkeit zählen nirgends. „Heute“ ist der Tag in der
+Zeitzone von Gladys.
+
+## Dashboard
+
+Das Widget **Heutige Aufgaben** zeigt zwei Kacheln (heute zu tun,
+überfällig), die Liste der Aufgaben des Tages, überfällige zuerst, mit Uhrzeit
+und zugewiesener Person, und eine Taste für jede der vier dringendsten: Ein
+Tipp markiert die Aufgabe als erledigt. Wähle in den Widget-Einstellungen ein
+Mitgliedsgerät, um nur dessen Aufgaben zu sehen; leer lassen für den ganzen
+Haushalt. Wenn nichts mehr ansteht, sagt das Widget es und zeigt die nächste
+Aufgabe.
+
+Die Zähler können auch wie jede Gerätefunktion aufs Dashboard.
+
+## Szenen
+
+### Auslöser
+
+- **Donetick-Aufgabe überfällig**: Eine Aufgabe hat ihre Fälligkeit
+  überschritten, ohne erledigt zu sein, einmal pro Fälligkeit (eine Aufgabe,
+  die am nächsten Tag noch überfällig ist, löst nicht erneut aus; ihr nächstes
+  Vorkommen schon). Filter: das zugewiesene Mitglied (ein Mitgliedsgerät), der
+  Name der Aufgabe. An die Aktionen weitergegebene Informationen: die Aufgabe,
+  ihre Nummer, wem sie zugewiesen ist, die Fälligkeit.
+- **Donetick-Aufgabe erledigt**: Eine Aufgabe wurde als erledigt markiert, in
+  Donetick oder über Gladys. Filter: wer sie erledigt hat (ein
+  Mitgliedsgerät), der Name der Aufgabe. Informationen: die Aufgabe, ihre
+  Nummer, wer sie erledigt hat und ob sie rechtzeitig erledigt wurde.
+
+Was beim ersten Start der Integration schon überfällig oder erledigt ist, ist
+bekannt, nicht neu: Dafür wird nichts ausgelöst. Ein Neustart meldet keine
+Aufgabe doppelt, und eine Aufgabe, die überfällig wurde, während die
+Integration gestoppt war, wird beim Neustart gemeldet.
+
+### Aktionen
+
+- **Donetick-Aufgabe als erledigt markieren**: markiert eine Aufgabe jetzt als
+  erledigt, im Namen des Benutzers des Zugriffstokens. Gib den **Namen** der
+  Aufgabe wie in Donetick geschrieben an (Groß- und Kleinschreibung und
+  Akzente egal) oder ihre **Nummer** (`#12`, die Nummer in der Adresse der
+  Aufgabenseite in Donetick). Das Feld akzeptiert Szenenvariablen. Ergebnisse
+  für die nächsten Schritte: die Aufgabe, ihre Nummer, ob sie auf Freigabe
+  wartet, ihre nächste Fälligkeit. Eine Aufgabe, die eine Freigabe braucht,
+  wird wie in Donetick zur Freigabe gesendet.
+
+### Szenenideen
+
+- Um 20 Uhr, wenn `Aufgaben für heute` eines Mitglieds über 0 liegt, ihm eine
+  Nachricht schicken.
+- Ein NFC-Tag oder eine Taste bei den Mülltonnen startet **Donetick-Aufgabe
+  als erledigt markieren** mit `Müll rausbringen`.
+- **Donetick-Aufgabe überfällig** mit dem Mitgliederfilter: dieses Mitglied
+  per Telegram benachrichtigen, mit der Aufgabe in der Nachricht.
+- **Donetick-Aufgabe erledigt** für `Pflanzen gießen`: den Gartenwasserhahn
+  schließen.
+
+## Fehlerbehebung
+
+- **„Donetick antwortet nicht“**: Prüfe Adresse und Port vom Gladys-Rechner
+  aus (`http://<Adresse>:2021` öffnet Donetick im Browser).
+- **„API-Token abgelehnt“**: Das Token wurde gelöscht oder falsch kopiert.
+  Erstelle ein neues in Donetick (Settings → Access tokens).
+- **„Keine Donetick-API unter dieser Adresse“**: Die Adresse antwortet, aber
+  nicht mit der Donetick-API: Prüfe den Port oder das Pfadpräfix hinter einem
+  Reverse Proxy.
+- **„Die Adresse leitet um“**: Gib die `https://`-Adresse ein.
+- **„Der Benutzer des Tokens ist dieser Aufgabe nicht zugewiesen“**: Donetick
+  lässt nur die Zugewiesenen (oder einen Admin oder Manager des Kreises) eine
+  Aufgabe erledigen. Verwende das Token eines Admins oder weise die Aufgabe
+  dem Token-Benutzer zu.
+- **„Noch nicht in ihrem Erledigungszeitraum“**: Die Aufgabe hat in Donetick
+  ein Erledigungsfenster und kann nicht so früh erledigt werden.
+- **Eine Aufgabe fehlt**: Archivierte Aufgaben und private Aufgaben anderer
+  Mitglieder sind für den Token-Benutzer nicht sichtbar.
+- Protokolle: `LOG_LEVEL=debug` am Container zeigt jede Abfrage.
+
+## Grenzen
+
+- Donetick wird alle 1 bis 10 Minuten gelesen (und zu jeder Fälligkeit und um
+  Mitternacht): Eine in Donetick erledigte Aufgabe erscheint innerhalb dieser
+  Zeit in Gladys.
+- Die Integration liest Aufgaben und markiert sie als erledigt, mehr nicht:
+  Aufgaben werden weder erstellt, geändert, übersprungen noch zugewiesen.
+- Getestet mit dem selbst gehosteten Donetick von Oktober 2026. Die Cloud
+  donetick.com sollte dasselbe Token an ihrer API-Adresse akzeptieren, das
+  wurde aber nicht getestet.
+- Gladys speichert keine Donetick-Daten außer `/data/donetick-state.json` (die
+  schon an Szenen gemeldeten Aufgaben).
+- Donetick hat ein eigenes Anfragelimit (standardmäßig 300 pro Minute): Die
+  Integration stellt zwei bis drei Anfragen pro Abfrage.
+- Keine Verbindung zu Donetick.

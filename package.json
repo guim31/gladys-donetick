@@ -1,8 +1,8 @@
 {
-  "name": "gladys-integration-template-js",
+  "name": "gladys-donetick",
   "version": "1.0.0",
   "private": true,
-  "description": "Official starter template to build an external integration for Gladys Assistant with the JavaScript SDK.",
+  "description": "Donetick integration for Gladys Assistant: household chores to do today and overdue, marked done from Gladys.",
   "type": "module",
   "main": "index.js",
   "scripts": {

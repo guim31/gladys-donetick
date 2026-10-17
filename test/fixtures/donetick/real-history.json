@@ -1,0 +1,30 @@
+{
+  "res": [
+    {
+      "id": 2,
+      "choreId": 1,
+      "performedAt": "2026-10-17T10:54:48.80044725Z",
+      "completedBy": 1,
+      "assignedTo": 1,
+      "notes": null,
+      "dueDate": "2026-10-16T08:00:00Z",
+      "updatedAt": "2026-10-17T10:54:48.868169447Z",
+      "createdAt": "2026-10-17T10:54:48.868169447Z",
+      "status": 1,
+      "syncVersion": 7
+    },
+    {
+      "id": 1,
+      "choreId": 3,
+      "performedAt": "2026-10-17T10:54:48.670572783Z",
+      "completedBy": 1,
+      "assignedTo": 2,
+      "notes": null,
+      "dueDate": "2026-10-14T07:00:00Z",
+      "updatedAt": "2026-10-17T10:54:48.712970259Z",
+      "createdAt": "2026-10-17T10:54:48.712970259Z",
+      "status": 1,
+      "syncVersion": 6
+    }
+  ]
+}
